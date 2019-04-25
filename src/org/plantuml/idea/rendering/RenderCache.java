@@ -1,10 +1,8 @@
 package org.plantuml.idea.rendering;
 
-import com.intellij.openapi.editor.Document;
 import com.intellij.openapi.fileEditor.FileDocumentManager;
-import com.intellij.openapi.fileEditor.FileEditorManager;
+import com.intellij.openapi.vfs.VirtualFileManager;
 
-import java.io.File;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
@@ -27,33 +25,41 @@ public class RenderCache {
         }
     }
 
-    public RenderCacheItem getCachedItem(String sourceFilePath, String source, int selectedPage, int zoom, FileEditorManager fileEditorManager, FileDocumentManager fileDocumentManager) {
+    public RenderCacheItem getCachedItem(String sourceFilePath, String source, int selectedPage, int zoom, FileDocumentManager fileDocumentManager, VirtualFileManager virtualFileManager) {
         RenderCacheItem cacheItem = null;
-        boolean checkCurrentItemSourceEquals = true;
-        Iterator<RenderCacheItem> iterator = cacheItems.descendingIterator();
 
         //error not cached in ArrayDeque
         if (displayedItem != null
                 && displayedItem.getRenderResult().hasError()
-                && !displayedItem.renderRequired(source, selectedPage, fileEditorManager, fileDocumentManager)) {
+                && !displayedItem.includedFilesChanged(fileDocumentManager, virtualFileManager)
+                && !displayedItem.imageMissingOrSourceChanged(source, selectedPage)) {
             logger.debug("returning displayedItem (error=true, requiresRendering=false)");
             return displayedItem;
         }
 
 
+        if (displayedItem != null && displayedItem.getSourceFilePath().equals(sourceFilePath) && displayedItem.getZoom() == zoom) {
+            cacheItem = displayedItem;
+            if (cacheItem.getSource().equals(source)) {
+                return cacheItem;
+            }
+        }
+
+
+        Iterator<RenderCacheItem> iterator = cacheItems.descendingIterator();
         while (iterator.hasNext()) {
             RenderCacheItem next = iterator.next();
             if (next.getSourceFilePath().equals(sourceFilePath) && next.getZoom() == zoom) {
                 if (cacheItem == null) {
                     cacheItem = next;
-                } else {
-                    if (checkCurrentItemSourceEquals && cacheItem.getSource().equals(source)) {
+                    if (cacheItem.getSource().equals(source)) {
                         break;
-                    } else if (next.getSource().equals(source)) {
+                    }
+                } else {
+                    if (next.getSource().equals(source)) {
                         cacheItem = next;
                         break;
                     }
-                    checkCurrentItemSourceEquals = false;
                 }
             }
         }
@@ -85,10 +91,6 @@ public class RenderCache {
         } else {
             return false;
         }
-    }
-
-    public static boolean isChanged(FileDocumentManager fileDocumentManager, File file, Long timestamp, Document document) {
-        return timestamp < file.lastModified() || (document != null && fileDocumentManager.isDocumentUnsaved(document));
     }
 
 

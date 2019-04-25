@@ -1,10 +1,14 @@
 package org.plantuml.idea.lang.settings;
 
-import com.intellij.openapi.components.*;
+import com.intellij.openapi.components.PersistentStateComponent;
+import com.intellij.openapi.components.ServiceManager;
+import com.intellij.openapi.components.State;
+import com.intellij.openapi.components.Storage;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.util.xmlb.XmlSerializerUtil;
 import net.sourceforge.plantuml.cucadiagram.dot.GraphvizUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.jetbrains.annotations.Nullable;
@@ -12,11 +16,15 @@ import org.plantuml.idea.toolwindow.PlantUmlToolWindow;
 import org.plantuml.idea.util.UIUtils;
 import org.plantuml.idea.util.Utils;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * @author Max Gorbunov
  * @author Eugene Steinberg
  */
-@State(name = "PlantUmlSettings", storages = {@Storage(file ="plantuml.cfg")})
+@State(name = "PlantUmlSettings", storages = {@Storage("plantuml.cfg")})
 public class PlantUmlSettings implements PersistentStateComponent<PlantUmlSettings> {
 
     private static final int CACHE_SIZE_DEFAULT_VALUE = 5;
@@ -29,6 +37,10 @@ public class PlantUmlSettings implements PersistentStateComponent<PlantUmlSettin
     private String renderDelay = String.valueOf(RENDER_DELAY_DEFAULT_VALUE);
     private String cacheSize = String.valueOf(CACHE_SIZE_DEFAULT_VALUE);
     private boolean autoRender = true;
+    private boolean autoComplete = true;
+    private boolean usePreferentiallyGRAPHIZ_DOT = false;
+    private String encoding = "UTF-8";
+    private String config = "";
 
     public static PlantUmlSettings getInstance() {
         return ServiceManager.getService(PlantUmlSettings.class);
@@ -97,6 +109,15 @@ public class PlantUmlSettings implements PersistentStateComponent<PlantUmlSettin
     public boolean isAutoRender() {
         return autoRender;
     }
+
+    public boolean isAutoComplete() {
+        return autoComplete;
+    }
+
+    public void setAutoComplete(boolean autoComplete) {
+        this.autoComplete = autoComplete;
+    }
+
     @Nullable
     @Override
     public PlantUmlSettings getState() {
@@ -131,11 +152,49 @@ public class PlantUmlSettings implements PersistentStateComponent<PlantUmlSettin
     }
 
     public void applyPlantumlOptions() {
-        if (String.valueOf(dotExecutable).isEmpty()) {
-            GraphvizUtils.setDotExecutable(null);
-        } else {
-            GraphvizUtils.setDotExecutable(dotExecutable);
+        boolean blank = StringUtils.isBlank(System.getProperty("GRAPHVIZ_DOT"));
+        boolean blank1 = StringUtils.isBlank(System.getenv("GRAPHVIZ_DOT"));
+        boolean propertyNotSet = blank && blank1;
+        boolean propertySet = !blank || !blank1;
+
+        if (propertyNotSet || (propertySet && !usePreferentiallyGRAPHIZ_DOT)) {
+            if (String.valueOf(dotExecutable).isEmpty()) {
+                GraphvizUtils.setDotExecutable(null);
+            } else {
+                GraphvizUtils.setDotExecutable(dotExecutable);
+            }
         }
     }
 
+    public boolean isUsePreferentiallyGRAPHIZ_DOT() {
+        return usePreferentiallyGRAPHIZ_DOT;
+    }
+
+    public void setUsePreferentiallyGRAPHIZ_DOT(boolean usePreferentiallyGRAPHIZ_DOT) {
+        this.usePreferentiallyGRAPHIZ_DOT = usePreferentiallyGRAPHIZ_DOT;
+    }
+
+    public String getEncoding() {
+        return encoding;
+    }
+
+    public void setEncoding(final String encoding) {
+        this.encoding = encoding;
+    }
+
+    public String getConfig() {
+        return config;
+    }
+
+    public void setConfig(final String config) {
+        this.config = config;
+    }
+
+    public List<String> getConfigAsList() {
+        if (StringUtils.isBlank(config)) {
+            return Collections.emptyList();
+        }
+        String[] split = config.split("\n");
+        return Arrays.asList(split);
+    }
 }

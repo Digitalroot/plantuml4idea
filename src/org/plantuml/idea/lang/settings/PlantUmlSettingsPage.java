@@ -26,6 +26,10 @@ public class PlantUmlSettingsPage implements Configurable {
     private JTextField renderDelay;
     private JTextField cacheSize;
     private JCheckBox renderUrlLinks;
+    private JCheckBox usePreferentiallyGRAPHIZ_DOT;
+    private JTextField encoding;
+    private JTextArea config;
+    private JTextArea configExample;
 
     public PlantUmlSettingsPage() {
         browse.addActionListener(new ActionListener() {
@@ -88,20 +92,30 @@ public class PlantUmlSettingsPage implements Configurable {
     public void disposeUIResources() {
     }
 
+    private void createUIComponents() {
+        configExample = new ConfigExample();
+    }
+
     public void setData(PlantUmlSettings data) {
         textFieldDotExecutable.setText(data.getDotExecutable());
         renderDelay.setText(data.getRenderDelay());
         cacheSize.setText(data.getCacheSize());
-        plantUMLErrorAnnotationExperimentalCheckBox.setSelected(data.isErrorAnnotationEnabled());
+        usePreferentiallyGRAPHIZ_DOT.setSelected(data.isUsePreferentiallyGRAPHIZ_DOT());
         renderUrlLinks.setSelected(data.isRenderUrlLinks());
+        plantUMLErrorAnnotationExperimentalCheckBox.setSelected(data.isErrorAnnotationEnabled());
+        encoding.setText(data.getEncoding());
+        config.setText(data.getConfig());
     }
 
     public void getData(PlantUmlSettings data) {
         data.setDotExecutable(textFieldDotExecutable.getText());
         data.setRenderDelay(renderDelay.getText());
         data.setCacheSize(cacheSize.getText());
-        data.setErrorAnnotationEnabled(plantUMLErrorAnnotationExperimentalCheckBox.isSelected());
+        data.setUsePreferentiallyGRAPHIZ_DOT(usePreferentiallyGRAPHIZ_DOT.isSelected());
         data.setRenderUrlLinks(renderUrlLinks.isSelected());
+        data.setErrorAnnotationEnabled(plantUMLErrorAnnotationExperimentalCheckBox.isSelected());
+        data.setEncoding(encoding.getText());
+        data.setConfig(config.getText());
     }
 
     public boolean isModified(PlantUmlSettings data) {
@@ -111,8 +125,13 @@ public class PlantUmlSettingsPage implements Configurable {
             return true;
         if (cacheSize.getText() != null ? !cacheSize.getText().equals(data.getCacheSize()) : data.getCacheSize() != null)
             return true;
-        if (plantUMLErrorAnnotationExperimentalCheckBox.isSelected() != data.isErrorAnnotationEnabled()) return true;
+        if (usePreferentiallyGRAPHIZ_DOT.isSelected() != data.isUsePreferentiallyGRAPHIZ_DOT()) return true;
         if (renderUrlLinks.isSelected() != data.isRenderUrlLinks()) return true;
+        if (plantUMLErrorAnnotationExperimentalCheckBox.isSelected() != data.isErrorAnnotationEnabled()) return true;
+        if (encoding.getText() != null ? !encoding.getText().equals(data.getEncoding()) : data.getEncoding() != null)
+            return true;
+        if (config.getText() != null ? !config.getText().equals(data.getConfig()) : data.getConfig() != null)
+            return true;
         return false;
     }
 }

@@ -1,6 +1,7 @@
 package org.plantuml.idea.plantuml;
 
 import net.sourceforge.plantuml.FileFormat;
+import org.plantuml.idea.lang.annotator.LanguagePatternHolder;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -50,29 +51,6 @@ public class PlantUml {
         public abstract FileFormat getFormat();
     }
 
-    public static final String SOURCE_TYPE_PATTERN = "uml|dot|jcckit|ditaa|salt|math|latex";
-    private static Pattern sourcePattern =
-            Pattern.compile("(?:(@start(?:" + SOURCE_TYPE_PATTERN + ")(?s).*?(?:@end(?:" + SOURCE_TYPE_PATTERN + ")|$))(?s).*?)+");
-
-    /**
-     * Extracts all
-     *
-     * @param text
-     * @return
-     */
-    public static Map<Integer, String> extractSources(String text) {
-        LinkedHashMap<Integer, String> result = new LinkedHashMap<Integer, String>();
-
-        if (text.contains(UMLSTART)) {
-
-            Matcher matcher = sourcePattern.matcher(text);
-
-            while (matcher.find()) {
-                result.put(matcher.start(), matcher.group());
-            }
-        }
-        return result;
-    }
 
     /**
      * Extracts plantUML diagram source code from the given string starting from given offset
@@ -100,12 +78,31 @@ public class PlantUml {
         return source;
     }
 
+    public static Map<Integer, String> extractSources(String text) {
+        LinkedHashMap<Integer, String> result = new LinkedHashMap<Integer, String>();
+
+        if (text.contains(UMLSTART)) {
+
+            Matcher matcher = LanguagePatternHolder.INSTANCE.sourcePattern.matcher(text);
+
+            while (matcher.find()) {
+                result.put(matcher.start(), matcher.group());
+            }
+        }
+        return result;
+    }
+
     private static Pattern sourceCommentPattern =
             Pattern.compile("^\\s*\\*\\s", Pattern.MULTILINE);
 
     private static String stripComments(String source) {
-        Matcher matcher = sourceCommentPattern.matcher(source);
-        return matcher.replaceAll("");
+        if (source.contains("@startmindmap")
+                || source.contains("@startwbs")) { //TODO something smarter
+            return source;
+        } else {
+            Matcher matcher = sourceCommentPattern.matcher(source);
+            return matcher.replaceAll("");
+        }
     }
 
 }

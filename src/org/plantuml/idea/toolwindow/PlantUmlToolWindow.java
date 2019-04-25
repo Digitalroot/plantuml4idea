@@ -10,6 +10,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.util.LowMemoryWatcher;
 import com.intellij.openapi.vfs.VirtualFile;
+import com.intellij.openapi.vfs.VirtualFileManager;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.ui.components.JBScrollPane;
 import org.jetbrains.annotations.NotNull;
@@ -24,10 +25,7 @@ import org.plantuml.idea.util.UIUtils;
 import javax.swing.*;
 import javax.swing.event.AncestorListener;
 import java.awt.*;
-import java.awt.event.MouseEvent;
-import java.awt.event.MouseMotionListener;
-import java.awt.event.MouseWheelEvent;
-import java.awt.event.MouseWheelListener;
+import java.awt.event.*;
 import java.io.File;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -57,6 +55,10 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
     private SelectedPagePersistentStateComponent selectedPagePersistentStateComponent;
     private FileEditorManager fileEditorManager;
     private FileDocumentManager fileDocumentManager;
+    private VirtualFileManager virtualFileManager;
+                                               
+    private int lastValidVerticalScrollValue;
+    private int lastValidHorizontalScrollValue;
 
     public PlantUmlToolWindow(Project project, final ToolWindow toolWindow) {
         super(new BorderLayout());
@@ -69,7 +71,8 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
         plantUmlAncestorListener = new PlantUmlAncestorListener(this, project);
         fileEditorManager = FileEditorManager.getInstance(project);
         fileDocumentManager = FileDocumentManager.getInstance();
-
+        virtualFileManager = VirtualFileManager.getInstance();
+                      
         setupUI();
         lazyExecutor = new LazyApplicationPoolExecutor(settings.getRenderDelayAsInt(), executionStatusPanel);
         LowMemoryWatcher.register(new Runnable() {
@@ -85,7 +88,7 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
                 }
             }
         }, this);
-        
+
         //must be last
         this.toolWindow.getComponent().addAncestorListener(plantUmlAncestorListener);
     }
@@ -101,8 +104,31 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
 
         scrollPane = new JBScrollPane(imagesPanel);
         scrollPane.getVerticalScrollBar().setUnitIncrement(20);
+        scrollPane.getVerticalScrollBar().addAdjustmentListener(new AdjustmentListener() {
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent adjustmentEvent) {
+                if (!adjustmentEvent.getValueIsAdjusting()) {
+                    RenderCacheItem displayedItem = getDisplayedItem();
+                    if (displayedItem != null && !displayedItem.getRenderResult().hasError()) {
+                        lastValidVerticalScrollValue = adjustmentEvent.getValue();
+                    }
+                }
+            }
+        });
+        scrollPane.getHorizontalScrollBar().addAdjustmentListener(new AdjustmentListener() {
+            @Override
+            public void adjustmentValueChanged(AdjustmentEvent adjustmentEvent) {
+                if (!adjustmentEvent.getValueIsAdjusting()) {
+                    RenderCacheItem displayedItem = getDisplayedItem();
+                    if (displayedItem != null && !displayedItem.getRenderResult().hasError()) {
+                        lastValidHorizontalScrollValue = adjustmentEvent.getValue();
+                    }
+                }
+
+            }
+        });
         imagesPanel.add(new Usage("Usage:\n"));
-        
+
         add(scrollPane, BorderLayout.CENTER);
 
         addScrollBarListeners(imagesPanel);
@@ -190,7 +216,7 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
 //                            selectedPage = selectedPagePersistentStateComponent.getPage(last.getSourceFilePath());
 //                            logger.debug("file switched, setting selected page ",selectedPage);
 //                        }
-                        
+
                         if (last != null && reason == RenderCommand.Reason.REFRESH) {
                             logger.debug("empty source, executing command, reason=", reason);
                             lazyExecutor.execute(getCommand(RenderCommand.Reason.REFRESH, last.getSourceFilePath(), last.getSource(), last.getBaseDir(), selectedPage, zoom, null, delay));
@@ -202,10 +228,10 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
 
                         if (last != null && last.isIncludedFile(selectedFile)) {
                             logger.debug("include file selected");
-                            if (last.isIncludedFileChanged(selectedFile, fileDocumentManager)) {
+                            if (last.includedFilesChanged(fileDocumentManager, virtualFileManager)) {
                                 logger.debug("includes changed, executing command");
                                 lazyExecutor.execute(getCommand(RenderCommand.Reason.INCLUDES, last.getSourceFilePath(), last.getSource(), last.getBaseDir(), selectedPage, zoom, last, delay));
-                            } else if (last.renderRequired(selectedPage, zoom, fileEditorManager, fileDocumentManager)) {
+                            } else if (last.imageMissingOrZoomChanged(selectedPage, zoom)) {
                                 logger.debug("render required");
                                 lazyExecutor.execute(getCommand(RenderCommand.Reason.SOURCE_PAGE_ZOOM, last.getSourceFilePath(), last.getSource(), last.getBaseDir(), selectedPage, zoom, last, delay));
                             } else {
@@ -233,9 +259,17 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
                         return;
                     }
 
-                    RenderCacheItem cachedItem = renderCache.getCachedItem(sourceFilePath, source, selectedPage, zoom, fileEditorManager, fileDocumentManager);
+                    RenderCacheItem cachedItem = renderCache.getCachedItem(sourceFilePath, source, selectedPage, zoom, fileDocumentManager, VirtualFileManager.getInstance());
 
-                    if (cachedItem == null || cachedItem.renderRequired(source, selectedPage, fileEditorManager, fileDocumentManager)) {
+                    if (cachedItem == null) {
+                        logger.debug("no cached item");
+                        final File selectedDir = UIUtils.getSelectedDir(fileEditorManager, fileDocumentManager);
+                        lazyExecutor.execute(getCommand(RenderCommand.Reason.REFRESH, sourceFilePath, source, selectedDir, selectedPage, zoom, cachedItem, delay));
+                    } else if (cachedItem.includedFilesChanged(fileDocumentManager, virtualFileManager)) {
+                        logger.debug("includedFilesChanged");
+                        final File selectedDir = UIUtils.getSelectedDir(fileEditorManager, fileDocumentManager);
+                        lazyExecutor.execute(getCommand(RenderCommand.Reason.INCLUDES, sourceFilePath, source, selectedDir, selectedPage, zoom, cachedItem, delay));
+                    } else if (cachedItem.imageMissingOrSourceChanged(source, selectedPage)) {
                         logger.debug("render required");
                         final File selectedDir = UIUtils.getSelectedDir(fileEditorManager, fileDocumentManager);
                         lazyExecutor.execute(getCommand(RenderCommand.Reason.SOURCE_PAGE_ZOOM, sourceFilePath, source, selectedDir, selectedPage, zoom, cachedItem, delay));
@@ -256,9 +290,9 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
     }
 
     public void displayExistingDiagram(RenderCacheItem last) {
-        executionStatusPanel.updateNow(last.getVersion(), ExecutionStatusPanel.State.DONE, "cached");
         last.setVersion(sequence.incrementAndGet());
         last.setRequestedPage(selectedPage);
+        executionStatusPanel.updateNow(last.getVersion(), ExecutionStatusPanel.State.DONE, "cached");
         displayDiagram(last);
     }
 
@@ -267,6 +301,7 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
     protected RenderCommand getCommand(RenderCommand.Reason reason, String selectedFile, final String source, @Nullable final File baseDir, final int page, final int zoom, RenderCacheItem cachedItem, LazyApplicationPoolExecutor.Delay delay) {
         logger.debug("#getCommand selectedFile='", selectedFile, "', baseDir=", baseDir, ", page=", page, ", zoom=", zoom);
         int version = sequence.incrementAndGet();
+
         return new MyRenderCommand(reason, selectedFile, source, baseDir, page, zoom, cachedItem, version, delay, renderUrlLinks, executionStatusPanel);
     }
 
@@ -290,7 +325,7 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
 
             if (displayDiagram(newItem)) {
                 executionStatusPanel.updateNow(newItem.getVersion(), ExecutionStatusPanel.State.DONE, total, result);
-            } 
+            }
         }
     }
 
@@ -299,6 +334,16 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
             logger.debug("skipping displaying older result", cacheItem);
             return false;
         }
+
+
+        //maybe track position per file?
+        RenderCacheItem displayedItem = renderCache.getDisplayedItem();
+        boolean restoreScrollPosition = displayedItem != null && displayedItem.getRenderResult().hasError() && renderCache.isSameFile(cacheItem);
+        //must be before revalidate
+        int lastValidVerticalScrollValue = this.lastValidVerticalScrollValue;
+        int lastValidHorizontalScrollValue = this.lastValidHorizontalScrollValue;
+
+
         renderCache.setDisplayedItem(cacheItem);
 
         ImageItem[] imagesWithData = cacheItem.getImageItems();
@@ -325,8 +370,23 @@ public class PlantUmlToolWindow extends JPanel implements Disposable {
             logger.debug("displaying image ", requestedPage);
             displayImage(cacheItem, requestedPage, imagesWithData[requestedPage]);
         }
+
+
         imagesPanel.revalidate();
         imagesPanel.repaint();
+
+        //would be nice without a new event :(
+        if (restoreScrollPosition) {
+            //hope concurrency wont be an issue
+            SwingUtilities.invokeLater(new Runnable() {
+                public void run() {
+                    scrollPane.getVerticalScrollBar().setValue(lastValidVerticalScrollValue);
+                    scrollPane.getHorizontalScrollBar().setValue(lastValidHorizontalScrollValue);
+                }
+            });
+        }
+
+
         return true;
     }
 

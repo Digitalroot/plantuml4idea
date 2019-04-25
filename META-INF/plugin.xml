@@ -1,14 +1,44 @@
 <idea-plugin version="2">
     <name>PlantUML integration</name>
-    <version>2.12.1</version>
-    <vendor>Eugene Steinberg</vendor>
+    <version>2.15.1</version>
+    <vendor url="https://github.com/esteinberg/plantuml4idea/">Eugene Steinberg</vendor>
     <!-- IJ 12+ -->
-    <idea-version since-build="162"/>
+    <idea-version since-build="182"/>
 
     <description>PlantUML diagramming tool integration</description>
 
     <change-notes>
         <![CDATA[
+            <p>2.15</p>
+            <ul>
+              <li>PlantUml library upgrade to v1.2019.5</li>
+              <li>Caching edge case fixed</li>
+              <li>Autocomplete improvements</li>
+            </ul>
+            <p>2.14</p>
+            <ul>
+              <li>PlantUml library upgrade to v1.2019.4</li>
+              <li>Automatic code completion popup</li>
+              <li>Fixed reverse arrow intention</li>
+              <li>Added settings for encoding and PlantUML config (global include)</li>
+              <li>Using the filename from "@startuml name" when exporting</li>
+              <li>Added highlighting of comments</li>
+              <li>Updated highlighting of tags and keywords</li>
+              <li>Fixed copy to clipboard</li>
+              <li>reStructuredText files support</li>
+            </ul>
+            <p>2.13</p>
+            <ul>
+              <li>PlantUml library upgrade to v1.2019.3</li>
+              <li>Fixed image scaling in Windows 10</li>
+              <li>Added MindMap support</li>
+              <li>Added Gantt support</li>
+              <li>Added Work Breakdown Structure support</li>
+              <li>Added option to use GRAPHVIZ_DOT environment variable preferentially</li>
+              <li>Grouped file templates</li>
+              <li>Restoring scroll position after an error</li>
+              <li>Zooming even when scale is defined in the code</li>
+            </ul>
             <p>2.12</p>
             <ul>
               <li>PlantUml library upgrade to v1.2018.11</li>
@@ -144,7 +174,7 @@
             <action id="PlantUML.ZoomActual" description="Actual Zoom" class="org.plantuml.idea.action.ZoomActualAction"
                     icon="/graph/actualZoom.png" text="Actual Zoom"/>
             <separator/>
-            
+
             <action id="PlantUML.PrevPage" description="Prev Page" class="org.plantuml.idea.action.PrevPageAction"
                     icon="/actions/back.png" text="Previous Page"/>
             <action id="PlantUML.NextPage" description="Next Page" class="org.plantuml.idea.action.NextPageAction"
@@ -153,6 +183,10 @@
             <separator/>
 
             <group id="PlantUML.Settings" icon="/general/settings.png" popup="true">
+                <action id="PlantUML.AutoPoup"
+                        class="org.plantuml.idea.action.AutoPopupToggleAction"
+                        text="Automatic Code Completion Popup"
+                        description="'Settings | Editor | General | Code Completion | Show suggestions as you type' must also be enabled"/>
                 <action id="PlantUML.AutoRender"
                         class="org.plantuml.idea.action.AutoRenderToggleAction"
                         text="Automatically Render"/>
@@ -168,6 +202,10 @@
                     class="org.plantuml.idea.action.AboutAction" text="About"/>
         </group>
 
+        <group id="NewPlantUML" text="PlantUML">
+            <action id="NewPlantUMLFile" class="org.plantuml.idea.plantuml.CreatePlantUMLFileAction"/>
+            <add-to-group group-id="NewGroup" anchor="before" relative-to-action="NewFromTemplate"/>
+        </group>
     </actions>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -195,5 +233,10 @@
         <externalAnnotator implementationClass="org.plantuml.idea.lang.annotator.PlantUmlExternalAnnotator"
                            language="PUML"/>
         <applicationService serviceImplementation="org.plantuml.idea.toolwindow.SelectedPagePersistentStateComponent"/>
+
+        <completion.contributor language="PUML"
+                                implementationClass="org.plantuml.idea.lang.PlantUmlCompletionContributor"/>
+        <typedHandler implementation="org.plantuml.idea.lang.PlantUmlCompletionAutoPopupHandler"
+                      id="PlantUmlCompletionAutoPopupHandler"/>
     </extensions>
 </idea-plugin>

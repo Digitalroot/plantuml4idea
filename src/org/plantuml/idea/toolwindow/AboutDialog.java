@@ -58,7 +58,7 @@ public class AboutDialog extends JDialog {
     }
 
     private void about() {
-        aboutEditorPane.setText("<html><body>PlantUML for Idea plugin</p><p>(c) Eugene Steinberg, 2012</p><p><a href=\"https://github.com/esteinberg/plantuml4idea\">PlantUML4idea on GitHub</a></p></body></html>");
+        aboutEditorPane.setText("<html><body>PlantUML for Idea plugin<br/>(c) Eugene Steinberg, 2012<br/><a href=\"https://github.com/esteinberg/plantuml4idea\">PlantUML4idea on GitHub</a><br/></body></html>");
         aboutEditorPane.addHyperlinkListener(
                 new BrowseHyperlinkListener()
         );
@@ -83,7 +83,8 @@ public class AboutDialog extends JDialog {
 
     private void testDot() {
         RenderRequest renderRequest = new RenderRequest(new File(""), PlantUml.TESTDOT, PlantUml.ImageFormat.PNG, 0, 100, null, false, RenderCommand.Reason.REFRESH);
-        RenderResult result = PlantUmlRenderer.render(renderRequest, null);
+        renderRequest.setUseSettings(false);
+        RenderResult result = PlantUmlRendererUtil.render(renderRequest, null);
         try {
             final ImageItem imageItem = result.getImageItem(0);
             if (imageItem != null) {
